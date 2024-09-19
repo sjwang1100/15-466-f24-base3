@@ -495,6 +495,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 //}
 
 std::vector<uint16_t> PlayMode::generate_randint_arr(int size, uint16_t upperBound) {
+	//from ChatGPT
+
 	std::vector<uint16_t> arr;
 	std::set<uint16_t> selectedNumbers;
 
