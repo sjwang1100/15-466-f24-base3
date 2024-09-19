@@ -13,6 +13,7 @@
 #include <random>
 #include <algorithm>
 #include <string>
+#include <set>
 
 #define WIDTH 0.7f
 #define HEIGHT 1.0f
@@ -44,7 +45,7 @@ void PlayMode::place_cards(uint8_t pairs) {
 	float hor_pos = -(horizontal_space * pairs / 2.0f);
 	uint8_t i = 0;
 
-	std::vector<uint16_t> rand_arr = generate_randint_arr(pairs);
+	std::vector<uint16_t> rand_arr = generate_randint_arr(pairs * 2);
 	for (; i < pairs; i++) {
 		auto newTrans = new Scene::Transform();
 		scene.drawables.emplace_back(newTrans);
@@ -65,7 +66,7 @@ void PlayMode::place_cards(uint8_t pairs) {
 		card[i].sound = sound;
 		card[i].soundIndex = rand_arr.at(i);
 		card[i].location = glm::vec2(hor_pos + i * horizontal_space, vertical_offset);
-		std::cout << i << card[i].soundIndex << std::endl;
+		//std::cout << i << card[i].soundIndex << std::endl;
 
 	}
 	vertical_offset = 0 - vertical_offset;
@@ -92,7 +93,7 @@ void PlayMode::place_cards(uint8_t pairs) {
 		card[i].soundIndex = rand_arr.at(i);
 		card[i].location = glm::vec2(hor_pos + i * horizontal_space, vertical_offset);
 
-		std::cout << i << card[i].soundIndex << std::endl;
+		//std::cout << i << card[i].soundIndex << std::endl;
 	}
 }
 
@@ -493,21 +494,28 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 //	return lower_leg->make_local_to_world() * glm::vec4(-1.26137f, -11.861f, 0.0f, 1.0f);
 //}
 
-std::vector<uint16_t> PlayMode::generate_randint_arr(uint16_t size) {
-	std::vector<uint16_t> arr(size * 2);
+std::vector<uint16_t> PlayMode::generate_randint_arr(int size, uint16_t upperBound) {
+	std::vector<uint16_t> arr;
+	std::set<uint16_t> selectedNumbers;
 
-	// fill the array with integers from 0 to n-1
-	for (uint16_t i = 0; i < (size * 2) - 1; i+=2) {
-		arr[i] = i;
-		arr[i + 1] = i;
+	// Step 1: Randomly select (size / 2) unique numbers from the range [0, upperBound)
+	std::random_device rd; // Random number generator seed
+	std::mt19937 g(rd());  // Mersenne Twister generator
+	std::uniform_int_distribution<uint16_t> dist(0, upperBound - 1);
+
+	while (selectedNumbers.size() < size / 2) {
+		uint16_t number = dist(g);
+		selectedNumbers.insert(number); // Insert unique numbers
 	}
 
-	// random number generator
-	std::random_device rd;
-	std::mt19937 gen(rd());
+	// Step 2: Add each selected number twice to the array
+	for (uint16_t num : selectedNumbers) {
+		arr.push_back(num);
+		arr.push_back(num);
+	}
 
-	// shuffle the array
-	std::shuffle(arr.begin(), arr.end(), gen);
+	// Step 3: Shuffle the array to randomize the order
+	std::shuffle(arr.begin(), arr.end(), g);
 
 	return arr;
 }

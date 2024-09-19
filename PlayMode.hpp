@@ -18,7 +18,7 @@ struct PlayMode : Mode {
 	virtual void update(float elapsed) override;
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
-	std::vector<uint16_t> generate_randint_arr(uint16_t size);
+	std::vector<uint16_t> generate_randint_arr(int size, uint16_t upperBound = 11);
 
 	//----- game state -----
 
