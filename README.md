@@ -1,8 +1,7 @@
-# (TODO: your game's title)
+# Sound Pair Match
+Author: Shao-Ju Wang
 
-Author: (TODO: your name)
-
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: Pair matching but using sound, distraction included.
 
 Screen Shot:
 
@@ -10,6 +9,9 @@ Screen Shot:
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+Use [0-9], [a-c], depending on the level, to open cards, match the card with the same sound.
+
+
+TODO: 1. Apply textures to card. 2. Open the card by mouse click
 
 This game was built with [NEST](NEST.md).

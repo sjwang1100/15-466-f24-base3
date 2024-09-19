@@ -250,44 +250,102 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 //	}
 //}
 
+
+
 int8_t old_opened = -1;
+bool flipping = false;
+int8_t flip_card = -1;
+int8_t flip_card2 = -1;
+float angle = 0.0f;
 void PlayMode::update(float elapsed) {
+
 
 	if (locked_pairs == LEVEL[level - 1]) {
 		return;
 	}
 
-	if (opened == -1 && clicked != -1) {
+	if (flip_card != -1) {
+		
+		if (flipping == true && angle < 180.0f) {
+			angle += 5.0f;
+			if (card[flip_card].locked) {
+				flip_card = -1;
+				clicked = -1;
+				assert(false);
+				return;
+			}
+			card[flip_card].drawable->transform->rotation *= glm::angleAxis(
+				glm::radians(5.0f),
+				glm::vec3(0.0f, 0.0f, 1.0f));
+			if (angle >= 180.0f) {
+				flip_card = -1;
+			}
+		}
+		else if (flipping == false && angle > 0) {
+			angle -= 5.0f;
+			if (card[flip_card].locked) {
+				flip_card = -1;
+				clicked = -1;
+				assert(false);
+				return;
+			}
+			if (card[flip_card2].locked) {
+				flip_card2 = -1;
+				clicked = -1;
+				assert(false);
+				return;
+			}
+			card[flip_card].drawable->transform->rotation *= glm::angleAxis(
+				glm::radians(-5.0f),
+				glm::vec3(0.0f, 0.0f, 1.0f));
+			if (flip_card2 != -1) {
+				card[flip_card].drawable->transform->rotation *= glm::angleAxis(
+					glm::radians(-5.0f),
+					glm::vec3(0.0f, 0.0f, 1.0f));
+			}
+			if (angle <= 0.0f) {
+				flip_card = -1;
+				flip_card2 = -1;
+			}
+		}
+
+		//clicked = -1;
+		return;
+	}
+
+	if (opened == -1 && clicked != -1) {	//player clicked something, and nothing opened
 		opened = clicked;
 		old_opened = clicked;
 		Sound::play(*card[opened].sound);
+		flip_card = opened;
+		flipping = true;
+		
 	}
-	else
+	else if (clicked != -1)
 	{
 		if (clicked != opened) {	// user press another key
-			//const Sound::Sample* s = ;
+			flip_card = clicked;
+			flipping = true;
 			Sound::play(*card[clicked].sound);
 			if (card[clicked].soundIndex == card[opened].soundIndex) {
 				card[clicked].locked = true;
 				card[opened].locked = true;
+				locked_pairs++;
 			}
 			else {
 				opened = -1;
+				flip_card = clicked;
+				flip_card2 = opened;
+				flipping = false;
 			}
 		}
 	}
+	clicked = -1;
 
 	/*if (old_opened != opened) {
 		Sound::play(card[opened].sound);
 		old_opened = opened;
 	}*/
-
-	// flip card
-	/*if (clicked != -1) {
-		card[clicked];
-	}*/
-
-	
 
 	//slowly rotates through [0,1):
 	/*wobble += elapsed / 10.0f;
@@ -395,7 +453,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		));
 
 		constexpr float H = 0.09f;
-		lines.draw_text("Click the pair of card of the same sound",
+		lines.draw_text("Click the pair of card of the same sound: First ROW: [0-3], Second ROW: [4-7]",
 			glm::vec3(-aspect + 0.1f * H, /*-1.0 + 0.1f * H, 0.0*/ 0.90, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
@@ -404,7 +462,10 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			glm::vec3(-aspect + 0.1f * H + ofs, /*-1.0 + 0.1f * H + ofs*/ 0.80, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
-		
+		lines.draw_text("Matched Pairs: " + int_to_string(locked_pairs),
+			glm::vec3(-aspect + 0.1f * H + ofs, /*-1.0 + 0.1f * H + ofs*/ 0.70, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
 		lines.draw_text("Level: " + std::to_string(level),
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
