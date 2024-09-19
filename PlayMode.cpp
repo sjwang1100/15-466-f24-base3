@@ -65,6 +65,7 @@ void PlayMode::place_cards(uint8_t pairs) {
 		card[i].sound = sound;
 		card[i].soundIndex = rand_arr.at(i);
 		card[i].location = glm::vec2(hor_pos + i * horizontal_space, vertical_offset);
+		std::cout << i << card[i].soundIndex << std::endl;
 
 	}
 	vertical_offset = 0 - vertical_offset;
@@ -90,6 +91,8 @@ void PlayMode::place_cards(uint8_t pairs) {
 		card[i].sound = sound;
 		card[i].soundIndex = rand_arr.at(i);
 		card[i].location = glm::vec2(hor_pos + i * horizontal_space, vertical_offset);
+
+		std::cout << i << card[i].soundIndex << std::endl;
 	}
 }
 
@@ -161,15 +164,15 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		}
 		else if (evt.key.keysym.sym == SDLK_a) {
-			clicked = 'a';
+			clicked = 10;
 			return true;
 		}
 		else if (evt.key.keysym.sym == SDLK_b) {
-			clicked = 'b';
+			clicked = 11;
 			return true;
 		}
 		else if (evt.key.keysym.sym == SDLK_c) {
-			clicked = 'c';
+			clicked = 12;
 			return true;
 		}
 
@@ -259,42 +262,29 @@ int8_t flip_card2 = -1;
 float angle = 0.0f;
 void PlayMode::update(float elapsed) {
 
+	if (clicked > (LEVEL[level - 1] * 2 - 1)) return;
 
 	if (locked_pairs == LEVEL[level - 1]) {
+		//std::cout << "here" << __LINE__ << std::endl;
 		return;
 	}
-
+	
 	if (flip_card != -1) {
-		
+		//std::cout << "here" << __LINE__ << std::endl;
 		if (flipping == true && angle < 180.0f) {
 			angle += 5.0f;
-			if (card[flip_card].locked) {
-				flip_card = -1;
-				clicked = -1;
-				assert(false);
-				return;
-			}
+
 			card[flip_card].drawable->transform->rotation *= glm::angleAxis(
 				glm::radians(5.0f),
 				glm::vec3(0.0f, 0.0f, 1.0f));
 			if (angle >= 180.0f) {
 				flip_card = -1;
 			}
+			//std::cout << "here" << __LINE__ << std::endl;
 		}
 		else if (flipping == false && angle > 0) {
 			angle -= 5.0f;
-			if (card[flip_card].locked) {
-				flip_card = -1;
-				clicked = -1;
-				assert(false);
-				return;
-			}
-			if (card[flip_card2].locked) {
-				flip_card2 = -1;
-				clicked = -1;
-				assert(false);
-				return;
-			}
+
 			card[flip_card].drawable->transform->rotation *= glm::angleAxis(
 				glm::radians(-5.0f),
 				glm::vec3(0.0f, 0.0f, 1.0f));
@@ -307,23 +297,36 @@ void PlayMode::update(float elapsed) {
 				flip_card = -1;
 				flip_card2 = -1;
 			}
+			//std::cout << "here" << __LINE__ << std::endl;
 		}
-
+		else {
+			flip_card = -1;
+		}
+		
 		//clicked = -1;
 		return;
 	}
-
+	//std::cout << "here" << __LINE__ << std::endl;
 	if (opened == -1 && clicked != -1) {	//player clicked something, and nothing opened
+		if (card[clicked].locked || card[opened].locked) {
+			clicked = -1;
+			opened = -1;
+			return;
+		}
 		opened = clicked;
 		old_opened = clicked;
 		Sound::play(*card[opened].sound);
 		flip_card = opened;
 		flipping = true;
-		
+		//std::cout << "here" << __LINE__ << std::endl;
 	}
 	else if (clicked != -1)
 	{
 		if (clicked != opened) {	// user press another key
+			if (card[clicked].locked) {
+				clicked = -1;
+				return;
+			}
 			flip_card = clicked;
 			flipping = true;
 			Sound::play(*card[clicked].sound);
@@ -331,14 +334,18 @@ void PlayMode::update(float elapsed) {
 				card[clicked].locked = true;
 				card[opened].locked = true;
 				locked_pairs++;
+				opened = -1;
+				//std::cout << "here" << __LINE__ << std::endl;
 			}
 			else {
 				opened = -1;
 				flip_card = clicked;
 				flip_card2 = opened;
 				flipping = false;
+				//std::cout << "here" << __LINE__ << std::endl;
 			}
 		}
+		//std::cout << "here" << __LINE__ << std::endl;
 	}
 	clicked = -1;
 
@@ -462,10 +469,16 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			glm::vec3(-aspect + 0.1f * H + ofs, /*-1.0 + 0.1f * H + ofs*/ 0.80, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		if (locked_pairs == LEVEL[level - 1]) {
+			lines.draw_text("You WON!!!!",
+				glm::vec3(-aspect + 0.1f * H + ofs, /*-1.0 + 0.1f * H + ofs*/ 0.70, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		}else 
 		lines.draw_text("Matched Pairs: " + int_to_string(locked_pairs),
 			glm::vec3(-aspect + 0.1f * H + ofs, /*-1.0 + 0.1f * H + ofs*/ 0.70, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
 		lines.draw_text("Level: " + std::to_string(level),
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
@@ -484,7 +497,7 @@ std::vector<uint16_t> PlayMode::generate_randint_arr(uint16_t size) {
 	std::vector<uint16_t> arr(size * 2);
 
 	// fill the array with integers from 0 to n-1
-	for (uint16_t i = 0; i < size; ++i) {
+	for (uint16_t i = 0; i < (size * 2) - 1; i+=2) {
 		arr[i] = i;
 		arr[i + 1] = i;
 	}
