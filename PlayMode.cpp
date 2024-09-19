@@ -12,28 +12,20 @@
 
 #include <random>
 #include <algorithm>
+#include <string>
+
+#define WIDTH 0.7f
+#define HEIGHT 1.0f
 
 GLuint hexapod_meshes_for_lit_color_texture_program = 0;
 Load< MeshBuffer > hexapod_meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer const *ret = new MeshBuffer(data_path("hexapod.pnct"));
+	MeshBuffer const *ret = new MeshBuffer(data_path("card_obvious.pnct"));
 	hexapod_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
 
 Load< Scene > hexapod_scene(LoadTagDefault, []() -> Scene const * {
-	return new Scene(data_path("hexapod.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		Mesh const &mesh = hexapod_meshes->lookup(mesh_name);
-
-		scene.drawables.emplace_back(transform);
-		Scene::Drawable &drawable = scene.drawables.back();
-
-		drawable.pipeline = lit_color_texture_program_pipeline;
-
-		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
-		drawable.pipeline.type = mesh.type;
-		drawable.pipeline.start = mesh.start;
-		drawable.pipeline.count = mesh.count;
-
+	return new Scene(data_path("empty.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
 	});
 });
 
@@ -41,65 +33,148 @@ Load< Sound::Sample > dusty_floor_sample(LoadTagDefault, []() -> Sound::Sample c
 	return new Sound::Sample(data_path("Random 99(1).opus"));
 });
 
-PlayMode::PlayMode() : scene(*hexapod_scene) {
-	//get pointers to leg for convenience:
-	/*for (auto &transform : scene.transforms) {
-		if (transform.name == "Hip.FL") hip = &transform;
-		else if (transform.name == "UpperLeg.FL") upper_leg = &transform;
-		else if (transform.name == "LowerLeg.FL") lower_leg = &transform;
+void PlayMode::place_cards(uint8_t pairs) {
+	//Mesh dummy;
+	//Mesh& mesh = dummy;
+
+	Mesh mesh = hexapod_meshes->lookup("Cube");
+	
+	float vertical_offset = 0.8f;
+	float horizontal_space = (10.0f - pairs * WIDTH) / ((float)pairs + 2.0f);
+	float hor_pos = -(horizontal_space * pairs / 2.0f);
+	uint8_t i = 0;
+
+	std::vector<uint16_t> rand_arr = generate_randint_arr(pairs);
+	for (; i < pairs; i++) {
+		auto newTrans = new Scene::Transform();
+		scene.drawables.emplace_back(newTrans);
+		Scene::Drawable& drawable = scene.drawables.back();
+
+		drawable.pipeline = lit_color_texture_program_pipeline;
+		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
+
+		drawable.pipeline.type = mesh.type;
+		drawable.pipeline.start = mesh.start;
+		drawable.pipeline.count = mesh.count;
+
+		drawable.transform->position = glm::vec3(0.0f, hor_pos + i * horizontal_space, vertical_offset);
+
+		auto sound = new Sound::Sample(data_path(sound_file_string[rand_arr.at(i)]));
+
+		card[i].drawable = &drawable;
+		card[i].sound = sound;
+		card[i].soundIndex = rand_arr.at(i);
+		card[i].location = glm::vec2(hor_pos + i * horizontal_space, vertical_offset);
+
 	}
-	if (hip == nullptr) throw std::runtime_error("Hip not found.");
-	if (upper_leg == nullptr) throw std::runtime_error("Upper leg not found.");
-	if (lower_leg == nullptr) throw std::runtime_error("Lower leg not found.");*/
+	vertical_offset = 0 - vertical_offset;
+	hor_pos = -(horizontal_space * pairs / 2.0f);
+	uint8_t j = 0;
+	for (; i < pairs * 2; i++) {
+		auto newTrans = new Scene::Transform();
+		scene.drawables.emplace_back(newTrans);
+		Scene::Drawable& drawable = scene.drawables.back();
 
-	/*hip_base_rotation = hip->rotation;
-	upper_leg_base_rotation = upper_leg->rotation;
-	lower_leg_base_rotation = lower_leg->rotation;*/
+		drawable.pipeline = lit_color_texture_program_pipeline;
+		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
 
+		drawable.pipeline.type = mesh.type;
+		drawable.pipeline.start = mesh.start;
+		drawable.pipeline.count = mesh.count;
+
+		drawable.transform->position = glm::vec3(0.0f, hor_pos + (j++)*horizontal_space, vertical_offset);
+
+		auto sound = new Sound::Sample(data_path(sound_file_string[rand_arr.at(i)]));
+
+		card[i].drawable = &drawable;
+		card[i].sound = sound;
+		card[i].soundIndex = rand_arr.at(i);
+		card[i].location = glm::vec2(hor_pos + i * horizontal_space, vertical_offset);
+	}
+}
+
+PlayMode::PlayMode() : scene(*hexapod_scene) {
+	level = 2;
+	card = new Card[(LEVEL[level - 1] * 2)];
+	place_cards(LEVEL[level-1]);
+	
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
 	camera = &scene.cameras.front();
+	camera->transform->position = glm::vec3(8.0f, 0.0f, 0.0f);
 
 	//start music loop playing:
 	// (note: position will be over-ridden in update())
-	//leg_tip_loop = Sound::loop_3D(*dusty_floor_sample, 1.0f, get_leg_tip_position(), 10.0f);
-	leg_tip_loop = Sound::loop(*dusty_floor_sample, 1.0f, 0.0f);
-
-	// generate random number
-	// source: https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
-	//std::random_device dev;
-	//std::mt19937 rng(dev());
-	//std::uniform_int_distribution<std::mt19937::result_type> rand(1, 6); // distribution in range [1, 6]
-	//std::cout << rand(rng) << std::endl;
+	leg_tip_loop = Sound::loop(*dusty_floor_sample, 0.5f, 0.0f);
 }
 
 PlayMode::~PlayMode() {
+	delete[] card;
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
-
+	glm::vec2 motion = glm::vec2(0.0f, 0.0f);
 	if (evt.type == SDL_KEYDOWN) {
-		if (evt.key.keysym.sym == SDLK_ESCAPE) {
-			SDL_SetRelativeMouseMode(SDL_FALSE);
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_a) {
-			left.downs += 1;
-			left.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_d) {
-			right.downs += 1;
-			right.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_w) {
-			up.downs += 1;
-			up.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_s) {
-			down.downs += 1;
-			down.pressed = true;
+		//if (evt.key.keysym.sym == SDLK_ESCAPE) {
+		//	//SDL_SetRelativeMouseMode(SDL_FALSE);
+		//	return true;
+		//}
+		//else 
+		if (evt.key.keysym.sym == SDLK_0) {
+			clicked = 0;
 			return true;
 		}
-	} else if (evt.type == SDL_KEYUP) {
+		else if (evt.key.keysym.sym == SDLK_1) {
+			clicked = 1;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_2) {
+			clicked = 2;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_3) {
+			clicked = 3;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_4) {
+			clicked = 4;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_5) {
+			clicked = 5;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_6) {
+			clicked = 6;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_7) {
+			clicked = 7;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_8) {
+			clicked = 8;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_9) {
+			clicked = 9;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_a) {
+			clicked = 'a';
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_b) {
+			clicked = 'b';
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_c) {
+			clicked = 'c';
+			return true;
+		}
+
+
+	}; /*else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
 			left.pressed = false;
 			return true;
@@ -113,34 +188,110 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			down.pressed = false;
 			return true;
 		}
-	} else if (evt.type == SDL_MOUSEBUTTONDOWN) {
-		if (SDL_GetRelativeMouseMode() == SDL_FALSE) {
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-			return true;
-		}
-	} else if (evt.type == SDL_MOUSEMOTION) {
-		if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
-			glm::vec2 motion = glm::vec2(
-				evt.motion.xrel / float(window_size.y),
-				-evt.motion.yrel / float(window_size.y)
-			);
-			camera->transform->rotation = glm::normalize(
-				camera->transform->rotation
-				* glm::angleAxis(-motion.x * camera->fovy, glm::vec3(0.0f, 1.0f, 0.0f))
-				* glm::angleAxis(motion.y * camera->fovy, glm::vec3(1.0f, 0.0f, 0.0f))
-			);
-			return true;
-		}
-	}
+	} else */
+	//if (evt.type == SDL_MOUSEBUTTONDOWN) {
+	//	//if (SDL_GetRelativeMouseMode() == SDL_FALSE) {
+	//	//	//SDL_SetRelativeMouseMode(SDL_TRUE);
+	//	//	return true;
+	//	//}
+	//	int i = (evt.button.y > (float(window_size.y) / 2.0f)) ? LEVEL[level - 1] : 0;
+	//	int max = (evt.button.y > (float(window_size.y) / 2.0f)) ? (LEVEL[level - 1] * 2) : LEVEL[level - 1];
+	//	for (; i < max; i++) {
+	//		if (card[i].drawable->transform->position.y - 0.4 < evt.button.x && card[i].drawable->transform->position.y + 0.4 > evt.button.x) {
+	//			if (card[i].drawable->transform->position.z - 0.5 < evt.button.y && card[i].drawable->transform->position.z + 0.5 > evt.button.y) {
+	//				
+	//				std::cout << i << std::endl;
+	//			}
+	//		}
+	//		
+	//	}
+	//	std::cout << card[3].drawable->transform->position.y - 0.4 << std::endl;
+	//	std::cout << card[3].drawable->transform->position.y + 0.4 << std::endl;
+	//	std::cout << i << std::endl;
+	//	std::cout << evt.button.x - (float(window_size.y) / 2.0f) << " " << -(evt.button.y - (float(window_size.y) / 2.0f)) << std::endl;
+
+
+	//	return true;
+	//} else if (evt.type == SDL_MOUSEMOTION) {
+	//	//if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
+	//	//	motion = glm::vec2(
+	//	//		evt.motion.xrel / float(window_size.y),
+	//	//		-evt.motion.yrel / float(window_size.y)
+	//	//	);
+	//	//	/*camera->transform->rotation = glm::normalize(
+	//	//		camera->transform->rotation
+	//	//		* glm::angleAxis(-motion.x * camera->fovy, glm::vec3(0.0f, 1.0f, 0.0f))
+	//	//		* glm::angleAxis(motion.y * camera->fovy, glm::vec3(1.0f, 0.0f, 0.0f))
+	//	//	);*/
+	//	//	return true;
+	//	//}
+	//	motion = glm::vec2(
+	//		evt.motion.x,
+	//		-evt.motion.y
+	//	);
+	//	/*camera->transform->rotation = glm::normalize(
+	//		camera->transform->rotation
+	//		* glm::angleAxis(-motion.x * camera->fovy, glm::vec3(0.0f, 1.0f, 0.0f))
+	//		* glm::angleAxis(motion.y * camera->fovy, glm::vec3(1.0f, 0.0f, 0.0f))
+	//	);*/
+	//	return true;
+	//}
 
 	return false;
 }
 
+//void flip_cards(float elapsed) {
+//	for (int i = 0; i < pairs * 2; i++) {
+//		if (!card[i].locked) {
+//			if (card[i].flip_count != 0.0f) {
+//				
+//			}
+//		}
+//	}
+//}
+
+int8_t old_opened = -1;
 void PlayMode::update(float elapsed) {
 
+	if (locked_pairs == LEVEL[level - 1]) {
+		return;
+	}
+
+	if (opened == -1 && clicked != -1) {
+		opened = clicked;
+		old_opened = clicked;
+		Sound::play(*card[opened].sound);
+	}
+	else
+	{
+		if (clicked != opened) {	// user press another key
+			//const Sound::Sample* s = ;
+			Sound::play(*card[clicked].sound);
+			if (card[clicked].soundIndex == card[opened].soundIndex) {
+				card[clicked].locked = true;
+				card[opened].locked = true;
+			}
+			else {
+				opened = -1;
+			}
+		}
+	}
+
+	/*if (old_opened != opened) {
+		Sound::play(card[opened].sound);
+		old_opened = opened;
+	}*/
+
+	// flip card
+	/*if (clicked != -1) {
+		card[clicked];
+	}*/
+
+	
+
 	//slowly rotates through [0,1):
-	wobble += elapsed / 10.0f;
-	wobble -= std::floor(wobble);
+	/*wobble += elapsed / 10.0f;
+	wobble -= std::floor(wobble);*/
 
 	/*hip->rotation = hip_base_rotation * glm::angleAxis(
 		glm::radians(5.0f * std::sin(wobble * 2.0f * float(M_PI))),
@@ -162,29 +313,29 @@ void PlayMode::update(float elapsed) {
 	{
 
 		//combine inputs into a move:
-		constexpr float PlayerSpeed = 30.0f;
-		glm::vec2 move = glm::vec2(0.0f);
-		if (left.pressed && !right.pressed) move.x =-1.0f;
-		if (!left.pressed && right.pressed) move.x = 1.0f;
-		if (down.pressed && !up.pressed) move.y =-1.0f;
-		if (!down.pressed && up.pressed) move.y = 1.0f;
+		//constexpr float PlayerSpeed = 30.0f;
+		//glm::vec2 move = glm::vec2(0.0f);
+		//if (left.pressed && !right.pressed) move.x =-1.0f;
+		//if (!left.pressed && right.pressed) move.x = 1.0f;
+		//if (down.pressed && !up.pressed) move.y =-1.0f;
+		//if (!down.pressed && up.pressed) move.y = 1.0f;
 
-		//make it so that moving diagonally doesn't go faster:
-		if (move != glm::vec2(0.0f)) move = glm::normalize(move) * PlayerSpeed * elapsed;
+		////make it so that moving diagonally doesn't go faster:
+		//if (move != glm::vec2(0.0f)) move = glm::normalize(move) * PlayerSpeed * elapsed;
 
-		glm::mat4x3 frame = camera->transform->make_local_to_parent();
-		glm::vec3 frame_right = frame[0];
-		//glm::vec3 up = frame[1];
-		glm::vec3 frame_forward = -frame[2];
+		//glm::mat4x3 frame = camera->transform->make_local_to_parent();
+		//glm::vec3 frame_right = frame[0];
+		////glm::vec3 up = frame[1];
+		//glm::vec3 frame_forward = -frame[2];
 
-		camera->transform->position += move.x * frame_right + move.y * frame_forward;
+		//camera->transform->position += move.x * frame_right + move.y * frame_forward;
 	}
 
 	{ //update listener to camera position:
-		glm::mat4x3 frame = camera->transform->make_local_to_parent();
+		/*glm::mat4x3 frame = camera->transform->make_local_to_parent();
 		glm::vec3 frame_right = frame[0];
 		glm::vec3 frame_at = frame[3];
-		Sound::listener.set_position_right(frame_at, frame_right, 1.0f / 60.0f);
+		Sound::listener.set_position_right(frame_at, frame_right, 1.0f / 60.0f);*/
 	}
 
 	//reset button press counters:
@@ -192,6 +343,24 @@ void PlayMode::update(float elapsed) {
 	right.downs = 0;
 	up.downs = 0;
 	down.downs = 0;
+}
+
+std::string int_to_string(int a) {
+	switch (a)
+	{
+	case 12:
+		return "c";
+	case 11:
+		return "b";
+	case 10:
+		return "a";
+	case -1:
+		return "None";
+	default:
+		//std::string m = ;
+		return std::to_string(a);
+		break;
+	}
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
@@ -227,14 +396,20 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 
 		constexpr float H = 0.09f;
 		lines.draw_text("Click the pair of card of the same sound",
-			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
+			glm::vec3(-aspect + 0.1f * H, /*-1.0 + 0.1f * H, 0.0*/ 0.90, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
 		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Level: ",
+		lines.draw_text("Opened: " + int_to_string(opened),
+			glm::vec3(-aspect + 0.1f * H + ofs, /*-1.0 + 0.1f * H + ofs*/ 0.80, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		
+		lines.draw_text("Level: " + std::to_string(level),
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+
 	}
 	GL_ERRORS();
 }
@@ -245,11 +420,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 //}
 
 std::vector<uint16_t> PlayMode::generate_randint_arr(uint16_t size) {
-	std::vector<uint16_t> arr(size);
+	std::vector<uint16_t> arr(size * 2);
 
 	// fill the array with integers from 0 to n-1
 	for (uint16_t i = 0; i < size; ++i) {
 		arr[i] = i;
+		arr[i + 1] = i;
 	}
 
 	// random number generator
@@ -261,3 +437,5 @@ std::vector<uint16_t> PlayMode::generate_randint_arr(uint16_t size) {
 
 	return arr;
 }
+
+//node Maekfile.js && cd dist && game.exe && cd ..
